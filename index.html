@@ -478,11 +478,42 @@ function Comentarios({ comentarios=[], onAdd, t }) {
     </div>
   );
 }
+// ─── Log input ───────────────────────────────────────────────────────────────
+function LogInput({ onAdd, t }) {
+  const [texto, setTexto] = useState("");
+  const [f, setF] = useState(false);
+  const submit = () => { if(!texto.trim()) return; onAdd(texto.trim()); setTexto(""); };
+  return (
+    <div style={{ padding:"10px 14px", borderTop:`1px solid ${t.border}`,
+      background:t.isDark?"#111":"#ede3d0" }}>
+      <textarea value={texto} onChange={e=>setTexto(e.target.value)} rows={2}
+        placeholder="Agregar actualización..."
+        onFocus={()=>setF(true)} onBlur={()=>setF(false)}
+        onKeyDown={e=>{ if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)) submit(); }}
+        style={{ width:"100%", background:t.input, border:`1px solid ${f?t.accent:t.inputBorder}`,
+          borderRadius:8, padding:"9px 12px", fontSize:14, fontFamily:"'Lora',serif",
+          color:t.text, outline:"none", resize:"none", transition:"border 0.2s" }}/>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6 }}>
+        <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:t.textMuted }}>
+          Ctrl+Enter para guardar
+        </span>
+        <button onClick={submit} disabled={!texto.trim()}
+          style={{ background:texto.trim()?t.accent:"transparent",
+            color:texto.trim()?"#fff":t.textMuted,
+            border:`1px solid ${texto.trim()?t.accent:t.border}`,
+            borderRadius:8, padding:"6px 14px", fontFamily:"'DM Mono',monospace",
+            fontSize:12, cursor:texto.trim()?"pointer":"default", transition:"all 0.15s" }}>
+          Guardar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function TicketCard({ ticket, clienteNombre, onEdit, onDelete, onChangeEstado, onAddComentario, showCliente=false, t, isAdmin=true, onResolverPor }) {
   const [expanded,setExpanded]=useState(false);
   const pr=PR[ticket.prioridad]||PR.Media;
   const closed=ticket.estado==="Resuelto"||ticket.estado==="Cancelado";
-  const numComentarios=(ticket.comentarios||[]).length;
   return (
     <div style={{ background:t.card, borderRadius:16, overflow:"hidden",
       border:`1px solid ${closed?t.border:pr.dot+"55"}`,
@@ -563,19 +594,53 @@ function TicketCard({ ticket, clienteNombre, onEdit, onDelete, onChangeEstado, o
           </span>
         </div>
 
-        {/* Contexto / Problema */}
-        {ticket.descripcion&&(
-          <div style={{ background:t.isDark?"#0f0f0f":"#f8f2e8", border:`1px solid ${t.border}`,
-            borderRadius:10, padding:"10px 14px" }}>
+        {/* Contexto / Problema + log cronológico */}
+        <div style={{ background:t.isDark?"#0f0f0f":"#f8f2e8", border:`1px solid ${t.border}`,
+          borderRadius:10, overflow:"hidden" }}>
+          <div style={{ padding:"10px 14px 0" }}>
             <div style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:t.textMuted,
-              textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:6 }}>
+              textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:10 }}>
               Contexto / Problema
             </div>
-            <div style={{ fontSize:14, color:t.text, lineHeight:1.65 }}>
-              {ticket.descripcion}
-            </div>
+            {/* entrada inicial */}
+            {ticket.descripcion&&(
+              <div style={{ marginBottom:8, paddingBottom:8,
+                borderBottom:(ticket.comentarios||[]).length>0?`1px dashed ${t.border}`:"none" }}>
+                <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:t.accent,
+                  marginBottom:4 }}>
+                  {fmtTime(ticket.creadoEn)} · inicio
+                </div>
+                <div style={{ fontSize:14, color:t.text, lineHeight:1.65 }}>
+                  {ticket.descripcion}
+                </div>
+              </div>
+            )}
+            {/* actualizaciones posteriores */}
+            {(ticket.comentarios||[]).map((c,i)=>(
+              <div key={c.id} style={{ marginBottom:8, paddingBottom:8,
+                borderBottom:i<(ticket.comentarios||[]).length-1?`1px dashed ${t.border}`:"none" }}>
+                <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:t.textMuted,
+                  marginBottom:4 }}>
+                  {fmtTime(c.creadoEn)}
+                </div>
+                <div style={{ fontSize:14, color:t.text, lineHeight:1.65 }}>
+                  {c.texto}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+          {/* input para agregar actualización */}
+          {expanded&&(
+            <LogInput onAdd={txt=>onAddComentario(ticket.id,txt)} t={t}/>
+          )}
+          <button onClick={()=>setExpanded(e=>!e)}
+            style={{ width:"100%", background:"transparent", border:"none",
+              borderTop:`1px solid ${t.border}`, padding:"8px", cursor:"pointer",
+              fontFamily:"'DM Mono',monospace", fontSize:11, color:t.textMuted,
+              display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+            {expanded?"▴ cerrar":"▾ agregar actualización"}
+          </button>
+        </div>
 
         {/* Acciones */}
         <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
@@ -589,20 +654,11 @@ function TicketCard({ ticket, clienteNombre, onEdit, onDelete, onChangeEstado, o
               ✓ Resolver
             </button>
           )}
-          <button onClick={()=>setExpanded(e=>!e)}
-            style={{ background:"transparent", border:`1px solid ${t.border}`, borderRadius:8,
-              padding:"6px 12px", fontFamily:"'DM Mono',monospace", fontSize:12,
-              color:numComentarios>0?t.text:t.textMuted, cursor:"pointer",
-              display:"flex", alignItems:"center", gap:5 }}>
-            💬 {numComentarios>0?numComentarios:""}  {expanded?"▴":"▾"}
-          </button>
           <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:t.textMuted,
             marginLeft:"auto", opacity:0.5 }}>
             {ticket.id.toUpperCase()}
           </span>
         </div>
-
-        {expanded&&<Comentarios comentarios={ticket.comentarios||[]} onAdd={txt=>onAddComentario(ticket.id,txt)} t={t}/>}
       </div>
     </div>
   );
