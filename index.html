@@ -418,7 +418,7 @@ function FormTicket({ inicial, onSave, onCancel, t, encargados=[], clientes=[], 
         </div>
       )}
 
-      <FTextarea label="Descripcion" value={form.descripcion} onChange={set("descripcion")} rows={3} t={t} span={2}/>
+      <FTextarea label="Contexto / Problema" value={form.descripcion} onChange={set("descripcion")} rows={4} t={t} span={2}/>
       <div style={{ display:"flex", gap:8, justifyContent:"flex-end", paddingTop:4 }}>
         <Btn variant="secondary" onClick={onCancel} t={t}>Cancelar</Btn>
         <Btn onClick={()=>canSave&&onSave(form)} t={t} disabled={!canSave}>
@@ -484,71 +484,125 @@ function TicketCard({ ticket, clienteNombre, onEdit, onDelete, onChangeEstado, o
   const closed=ticket.estado==="Resuelto"||ticket.estado==="Cancelado";
   const numComentarios=(ticket.comentarios||[]).length;
   return (
-    <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:12,
-      padding:"14px 15px", borderLeft:`3px solid ${pr.dot}`, opacity:closed?0.6:1 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10 }}>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:"flex", gap:7, alignItems:"flex-start", flexWrap:"wrap", marginBottom:6 }}>
-            <span style={{ fontFamily:"'Lora',serif", fontStyle:"italic", fontSize:15, color:t.text,
-              textDecoration:closed?"line-through":"none", lineHeight:1.3, flex:1, minWidth:0 }}>
+    <div style={{ background:t.card, borderRadius:16, overflow:"hidden",
+      border:`1px solid ${closed?t.border:pr.dot+"55"}`,
+      boxShadow:closed?"none":`0 0 0 0 ${pr.dot}`,
+      opacity:closed?0.65:1, transition:"opacity 0.2s" }}>
+
+      {/* Franja superior con orden destacado */}
+      <div style={{ background:closed?t.surface:t.isDark?"#111":"#f0e8dc",
+        borderBottom:`1px solid ${t.border}`,
+        padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, minWidth:0 }}>
+          {/* barra de prioridad */}
+          <div style={{ width:4, height:36, borderRadius:2, background:pr.dot, flexShrink:0 }}/>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontFamily:"'Lora',serif", fontStyle:"italic", fontSize:17, color:t.text,
+              textDecoration:closed?"line-through":"none", lineHeight:1.25,
+              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
               {ticket.titulo}
-            </span>
-            <div style={{ display:"flex", gap:5, flexShrink:0, flexWrap:"wrap" }}>
-              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:t.textMuted,
-                background:t.surface, border:`1px solid ${t.border}`, borderRadius:4, padding:"2px 7px" }}>
+            </div>
+            <div style={{ display:"flex", gap:6, alignItems:"center", marginTop:4, flexWrap:"wrap" }}>
+              {ticket.orden&&(
+                <span style={{ fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:500,
+                  color:t.isDark?"#f0b840":"#9b6a00",
+                  background:t.isDark?"#2a2010":"#fdf3dc",
+                  border:`1px solid ${t.isDark?"#5a4010":"#f5d07a"}`,
+                  borderRadius:6, padding:"2px 10px", letterSpacing:"0.04em" }}>
+                  # {ticket.orden}
+                </span>
+              )}
+              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:t.textMuted,
+                background:t.surface, border:`1px solid ${t.border}`, borderRadius:5, padding:"2px 8px" }}>
                 {ticket.tipo}
               </span>
-              {ticket.orden&&(
-                <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:t.accent,
-                  background:t.isDark?"#1a0e08":"#fdf0e8", border:`1px solid ${t.isDark?"#3a1e0a":"#f5c8a0"}`,
-                  borderRadius:4, padding:"2px 7px" }}>#{ticket.orden}</span>
-              )}
               {ticket.origenCliente&&(
                 <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:"#5a9ed4",
                   background:t.isDark?"#0e2030":"#e8f0fc", border:`1px solid ${t.isDark?"#1a4060":"#b8cef7"}`,
-                  borderRadius:4, padding:"2px 7px" }}>cliente</span>
+                  borderRadius:5, padding:"2px 7px" }}>formulario</span>
               )}
             </div>
           </div>
-          <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:t.textMuted, marginBottom:8 }}>
-            ref: {ticket.id.toUpperCase()}
-          </div>
-          <div className="ticket-meta" style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", marginBottom:10 }}>
-            <PriorityPill value={ticket.prioridad} t={t}/>
-            {showCliente&&clienteNombre&&<span style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:t.textMuted }}>👤 {clienteNombre}</span>}
-            {ticket.asignado&&!showCliente&&<span style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:t.textMuted }}>👤 {ticket.asignado}</span>}
-            {ticket.resueltoPor&&<span style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:"#5fc48a" }}>✓ {ticket.resueltoPor.split('@')[0]}</span>}
-            <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:t.textMuted, marginLeft:"auto" }}>{timeAgo(ticket.creadoEn)}</span>
-          </div>
-          <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-            <EstadoDropdown value={ticket.estado} onChange={v=>{onChangeEstado(ticket.id,v); if(v==="Resuelto"&&onResolverPor) onResolverPor(ticket.id);}} t={t}/>
-            {!isAdmin&&ticket.estado!=="Resuelto"&&ticket.estado!=="Cancelado"&&onResolverPor&&(
-              <button onClick={()=>{onChangeEstado(ticket.id,"Resuelto"); if(onResolverPor) onResolverPor(ticket.id);}}
-                style={{ background:"#0a2018", border:"1px solid #1a4a2a", borderRadius:8,
-                  padding:"6px 12px", fontFamily:"'DM Mono',monospace", fontSize:12,
-                  color:"#5fc48a", cursor:"pointer", display:"flex", alignItems:"center", gap:5 }}>
-                ✓ Resolver
-              </button>
-            )}
-            <button onClick={()=>setExpanded(e=>!e)}
-              style={{ background:"transparent", border:`1px solid ${t.border}`, borderRadius:8,
-                padding:"5px 10px", fontFamily:"'DM Mono',monospace", fontSize:11,
-                color:t.textMuted, cursor:"pointer", display:"flex", alignItems:"center", gap:5 }}>
-              💬 {numComentarios} {expanded?"▴":"▾"}
-            </button>
-          </div>
-          {ticket.descripcion&&(
-            <div style={{ fontSize:13, color:t.textSub, marginTop:10, fontStyle:"italic",
-              lineHeight:1.6, borderTop:`1px solid ${t.borderFaint||t.border}`, paddingTop:8 }}>
+        </div>
+        <div style={{ display:"flex", gap:4, flexShrink:0 }}>
+          {isAdmin&&<button onClick={()=>onEdit(ticket)}
+            style={{ background:t.isDark?"#1e1e1e":"#e0d4be", border:`1px solid ${t.border}`,
+              borderRadius:8, width:32, height:32, cursor:"pointer", color:t.textMuted,
+              fontSize:14, display:"flex", alignItems:"center", justifyContent:"center" }}>✎</button>}
+          {isAdmin&&<button onClick={()=>onDelete(ticket.id)}
+            style={{ background:"transparent", border:"none", borderRadius:8,
+              width:32, height:32, cursor:"pointer", color:"#e05252",
+              fontSize:16, display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>}
+        </div>
+      </div>
+
+      {/* Cuerpo */}
+      <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+
+        {/* Meta row */}
+        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          <PriorityPill value={ticket.prioridad} t={t}/>
+          {showCliente&&clienteNombre&&(
+            <span style={{ fontFamily:"'DM Mono',monospace", fontSize:12, color:t.textMuted }}>👤 {clienteNombre}</span>
+          )}
+          {ticket.asignado&&!showCliente&&(
+            <span style={{ fontFamily:"'DM Mono',monospace", fontSize:12, color:t.textMuted,
+              background:t.surface, border:`1px solid ${t.border}`, borderRadius:6, padding:"2px 9px" }}>
+              👤 {ticket.asignado}
+            </span>
+          )}
+          {ticket.resueltoPor&&(
+            <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:"#5fc48a",
+              background:t.isDark?"#0a2018":"#e6f7ef", border:`1px solid ${t.isDark?"#1a4a2a":"#a3dfc0"}`,
+              borderRadius:6, padding:"2px 9px" }}>
+              ✓ {ticket.resueltoPor.split("@")[0]}
+            </span>
+          )}
+          <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:t.textMuted, marginLeft:"auto" }}>
+            {timeAgo(ticket.creadoEn)}
+          </span>
+        </div>
+
+        {/* Contexto / Problema */}
+        {ticket.descripcion&&(
+          <div style={{ background:t.isDark?"#0f0f0f":"#f8f2e8", border:`1px solid ${t.border}`,
+            borderRadius:10, padding:"10px 14px" }}>
+            <div style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:t.textMuted,
+              textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:6 }}>
+              Contexto / Problema
+            </div>
+            <div style={{ fontSize:14, color:t.text, lineHeight:1.65 }}>
               {ticket.descripcion}
             </div>
+          </div>
+        )}
+
+        {/* Acciones */}
+        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          <EstadoDropdown value={ticket.estado}
+            onChange={v=>{ onChangeEstado(ticket.id,v); if(v==="Resuelto"&&onResolverPor) onResolverPor(ticket.id); }} t={t}/>
+          {!isAdmin&&ticket.estado!=="Resuelto"&&ticket.estado!=="Cancelado"&&onResolverPor&&(
+            <button onClick={()=>{ onChangeEstado(ticket.id,"Resuelto"); if(onResolverPor) onResolverPor(ticket.id); }}
+              style={{ background:"#0a2018", border:"1px solid #1a4a2a", borderRadius:8,
+                padding:"7px 14px", fontFamily:"'DM Mono',monospace", fontSize:12,
+                color:"#5fc48a", cursor:"pointer" }}>
+              ✓ Resolver
+            </button>
           )}
-          {expanded&&<Comentarios comentarios={ticket.comentarios||[]} onAdd={txt=>onAddComentario(ticket.id,txt)} t={t}/>}
+          <button onClick={()=>setExpanded(e=>!e)}
+            style={{ background:"transparent", border:`1px solid ${t.border}`, borderRadius:8,
+              padding:"6px 12px", fontFamily:"'DM Mono',monospace", fontSize:12,
+              color:numComentarios>0?t.text:t.textMuted, cursor:"pointer",
+              display:"flex", alignItems:"center", gap:5 }}>
+            💬 {numComentarios>0?numComentarios:""}  {expanded?"▴":"▾"}
+          </button>
+          <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:t.textMuted,
+            marginLeft:"auto", opacity:0.5 }}>
+            {ticket.id.toUpperCase()}
+          </span>
         </div>
-        <div style={{ display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}>
-          {isAdmin&&<button onClick={()=>onEdit(ticket)} style={{ background:"none", border:"none", cursor:"pointer", color:t.textMuted, fontSize:16, padding:"4px 6px" }}>✎</button>}
-          {isAdmin&&<button onClick={()=>onDelete(ticket.id)} style={{ background:"none", border:"none", cursor:"pointer", color:"#e05252", fontSize:16, padding:"4px 6px" }}>x</button>}
-        </div>
+
+        {expanded&&<Comentarios comentarios={ticket.comentarios||[]} onAdd={txt=>onAddComentario(ticket.id,txt)} t={t}/>}
       </div>
     </div>
   );
@@ -825,7 +879,7 @@ function QuickTicketModal({ clientes, onClose, onSave, t, encargados=[] }) {
                 </div>
                 <FSel label="Estado" value={form.estado} onChange={v=>setForm(f=>({...f,estado:v}))} options={ESTADOS_TICKET} t={t}/>
               </div>
-              <FTextarea label="Descripcion" value={form.descripcion} onChange={v=>setForm(f=>({...f,descripcion:v}))} rows={2} t={t}/>
+              <FTextarea label="Contexto / Problema" value={form.descripcion} onChange={v=>setForm(f=>({...f,descripcion:v}))} rows={3} t={t}/>
               {clienteSel&&(
                 <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:10, padding:"10px 14px",
                   display:"flex", alignItems:"center", justifyContent:"space-between" }}>
