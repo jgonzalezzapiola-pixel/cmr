@@ -57,6 +57,9 @@ const SUPA_KEY = "sb_publishable_1IZJRxl3pk8kc1z2ni_UNw_hnDS0F8e";
 const supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 
 const uid = () => Math.random().toString(36).slice(2,10);
+const normalizar = (str) => (str||"").toLowerCase().trim()
+  .normalize("NFD").replace(/[̀-ͯ]/g,"")
+  .replace(/\s+/g," ");
 const today = () => new Date().toISOString().split("T")[0];
 const nowIso = () => new Date().toISOString();
 const fmt = (iso) => { if(!iso) return "—"; const [y,m,d]=iso.split("T")[0].split("-"); return `${d}/${m}/${y}`; };
@@ -732,6 +735,108 @@ function TicketCard({ ticket, clienteNombre, onEdit, onDelete, onChangeEstado, o
     </div>
   );
 }
+// ─── Kanban Card (compacta + expandible) ─────────────────────────────────────
+function KanbanCard({ ticket, clienteNombre, onEdit, onDelete, onChangeEstado, onAddComentario, isAdmin, t }) {
+  const [expanded, setExpanded] = useState(false);
+  const pr = PR[ticket.prioridad]||PR.Media;
+  const closed = ticket.estado==="Resuelto"||ticket.estado==="Cancelado";
+  return (
+    <div style={{ background:t.card, borderRadius:12, border:`1px solid ${expanded?pr.dot+"88":t.border}`,
+      borderLeft:`3px solid ${pr.dot}`, opacity:closed?0.65:1,
+      transition:"border-color 0.2s", overflow:"hidden" }}>
+
+      {/* Cabecera — siempre visible, click para expandir */}
+      <div onClick={()=>setExpanded(e=>!e)} style={{ padding:"10px 12px", cursor:"pointer" }}>
+        {/* fila 1: título + acciones */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6, marginBottom:6 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:t.text, lineHeight:1.3,
+            overflow:"hidden", display:"-webkit-box", WebkitLineClamp:expanded?99:2,
+            WebkitBoxOrient:"vertical" }}>
+            {ticket.titulo}
+          </div>
+          <div style={{ display:"flex", gap:2, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
+            {isAdmin&&<button onClick={()=>onEdit(ticket)}
+              style={{ background:"none", border:"none", cursor:"pointer", color:t.textMuted,
+                fontSize:13, padding:"2px 4px", lineHeight:1 }}>✎</button>}
+            {isAdmin&&<button onClick={()=>onDelete(ticket.id)}
+              style={{ background:"none", border:"none", cursor:"pointer", color:"#ef4444",
+                fontSize:15, padding:"2px 4px", lineHeight:1 }}>×</button>}
+          </div>
+        </div>
+        {/* fila 2: orden + tipo */}
+        <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8 }}>
+          {ticket.orden&&(
+            <span style={{ fontSize:11, fontWeight:700, color:"#f59e0b",
+              background:t.isDark?"#2a2010":"#fef3c7", border:`1px solid ${t.isDark?"#5a4010":"#fde68a"}`,
+              borderRadius:5, padding:"1px 7px" }}>#{ticket.orden}</span>
+          )}
+          <span style={{ fontSize:11, color:t.textMuted,
+            background:t.surface, border:`1px solid ${t.border}`, borderRadius:5, padding:"1px 7px" }}>
+            {ticket.tipo}
+          </span>
+        </div>
+        {/* fila 3: prioridad + cliente + fecha */}
+        <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+          <PriorityPill value={ticket.prioridad} t={t}/>
+          {clienteNombre&&<span style={{ fontSize:11, color:t.textMuted, flex:1,
+            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{clienteNombre}</span>}
+          {ticket.asignado&&!clienteNombre&&<span style={{ fontSize:11, color:t.textMuted }}>👤 {ticket.asignado}</span>}
+          <span style={{ fontSize:10, color:t.textMuted, marginLeft:"auto", flexShrink:0 }}>{timeAgo(ticket.creadoEn)}</span>
+          <span style={{ fontSize:10, color:t.textMuted }}>{expanded?"▴":"▾"}</span>
+        </div>
+      </div>
+
+      {/* Contenido expandido */}
+      {expanded&&(
+        <div style={{ borderTop:`1px solid ${t.border}` }}>
+          {/* Contexto / log */}
+          <div style={{ background:t.isDark?"#0f0f0f":"#f8fafc", padding:"10px 12px" }}>
+            <div style={{ fontSize:10, fontWeight:600, color:t.textMuted,
+              textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>
+              Contexto / Problema
+            </div>
+            {ticket.descripcion&&(
+              <div style={{ marginBottom:(ticket.comentarios||[]).length>0?8:0,
+                paddingBottom:(ticket.comentarios||[]).length>0?8:0,
+                borderBottom:(ticket.comentarios||[]).length>0?`1px dashed ${t.border}`:"none" }}>
+                <div style={{ fontSize:11, fontWeight:600, color:t.accent, marginBottom:3 }}>
+                  {fmtTime(ticket.creadoEn)} · inicio
+                </div>
+                <div style={{ fontSize:13, color:t.text, lineHeight:1.6 }}>{ticket.descripcion}</div>
+              </div>
+            )}
+            {(ticket.comentarios||[]).map((c,i)=>(
+              <div key={c.id} style={{ marginBottom:i<(ticket.comentarios||[]).length-1?8:0,
+                paddingBottom:i<(ticket.comentarios||[]).length-1?8:0,
+                borderBottom:i<(ticket.comentarios||[]).length-1?`1px dashed ${t.border}`:"none" }}>
+                <div style={{ fontSize:11, fontWeight:500, color:t.textMuted, marginBottom:3 }}>{fmtTime(c.creadoEn)}</div>
+                <div style={{ fontSize:13, color:t.text, lineHeight:1.6 }}>{c.texto}</div>
+              </div>
+            ))}
+          </div>
+          {/* Agregar actualización */}
+          <LogInput onAdd={txt=>onAddComentario(ticket.id,txt)} t={t}/>
+          {/* Estado */}
+          <div style={{ padding:"10px 12px", borderTop:`1px solid ${t.border}`,
+            display:"flex", alignItems:"center", gap:8 }} onClick={e=>e.stopPropagation()}>
+            <EstadoDropdown value={ticket.estado} onChange={v=>onChangeEstado(ticket.id,v)} t={t}/>
+            <span style={{ fontSize:10, fontFamily:"'DM Mono',monospace", color:t.textMuted,
+              marginLeft:"auto", opacity:0.5 }}>{ticket.id.toUpperCase()}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Estado siempre visible cuando colapsado */}
+      {!expanded&&(
+        <div style={{ padding:"8px 12px", borderTop:`1px solid ${t.border}` }}
+          onClick={e=>e.stopPropagation()}>
+          <EstadoDropdown value={ticket.estado} onChange={v=>onChangeEstado(ticket.id,v)} t={t}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KanbanView({ clientes, onUpdateCliente, t, isAdmin, user, encargados=[] }) {
   const [editando, setEditando] = useState(null); // { ticket, clienteId }
 
@@ -792,13 +897,12 @@ function KanbanView({ clientes, onUpdateCliente, t, isAdmin, user, encargados=[]
                 {col.length===0&&<div style={{ background:t.card, border:`1px dashed ${t.border}`, borderRadius:10, padding:"20px", textAlign:"center", color:t.textMuted, fontFamily:"'DM Mono',monospace", fontSize:11 }}>Sin tickets</div>}
                 {[...col].sort((a,b)=>{ const ord={Alta:0,Media:1,Baja:2}; return (ord[a.prioridad]??1)-(ord[b.prioridad]??1); })
                   .map(tk=>(
-                    <TicketCard key={tk.id} ticket={tk} clienteNombre={tk.clienteNombre} showCliente={true}
+                    <KanbanCard key={tk.id} ticket={tk} clienteNombre={tk.clienteNombre}
                       isAdmin={isAdmin}
                       onEdit={x=>setEditando({ticket:{...x}, clienteId:tk.clienteId})}
                       onDelete={()=>delTicket(tk.clienteId,tk.id)}
                       onChangeEstado={(_,ne)=>cambiarEstado(tk.clienteId,tk.id,ne)}
                       onAddComentario={(_,txt)=>addComentario(tk.clienteId,tk.id,txt)}
-                      onResolverPor={(tkId)=>cambiarEstado(tk.clienteId,tkId,"Resuelto",true)}
                       t={t}/>
                   ))}
               </div>
@@ -1363,20 +1467,33 @@ function CRM({ user, onLogout }) {
                           cursor:"pointer", transition:"background 0.15s" }}
                         onMouseEnter={e=>e.currentTarget.style.background=t.cardHover}
                         onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        <div>
+                        <div style={{ minWidth:0 }}>
                           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
                             <span className="row-name" style={{ fontSize:15, fontWeight:600, color:t.text, lineHeight:1.2 }}>{c.nombre}</span>
                             {tieneOrigenCliente&&(
-                              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:"#5a9ed4",
+                              <span style={{ fontSize:9, fontWeight:600, color:"#5a9ed4",
                                 background:t.isDark?"#0e2030":"#e8f0fc", border:`1px solid ${t.isDark?"#1a4060":"#b8cef7"}`,
                                 borderRadius:4, padding:"2px 6px", flexShrink:0 }}>nuevo</span>
                             )}
                           </div>
-                          <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:t.textMuted }}>
-                            {abiertos.length>0
-                              ?<span style={{ color:hasAlta?"#e05252":"#d4b84a" }}>{abiertos.length} abierto{abiertos.length>1?"s":""}</span>
-                              :<span style={{ color:"#5fc48a" }}>al dia</span>}
-                          </div>
+                          {(()=>{
+                            if(abiertos.length===0) return <span style={{ fontSize:11, color:"#10b981", fontWeight:500 }}>✓ al dia</span>;
+                            const ord={Alta:0,Media:1,Baja:2};
+                            const top=[...abiertos].sort((a,b)=>(ord[a.prioridad]??1)-(ord[b.prioridad]??1))[0];
+                            const preview=top.descripcion?.trim()||top.titulo||"";
+                            const cortado=preview.length>60?preview.slice(0,60)+"…":preview;
+                            return (
+                              <div>
+                                <span style={{ fontSize:11, color:hasAlta?"#ef4444":"#f59e0b", fontWeight:500 }}>
+                                  {abiertos.length} abierto{abiertos.length>1?"s":""}{abiertos.length>1?" · más urgente:":""}
+                                </span>
+                                {cortado&&<div style={{ fontSize:12, color:t.textMuted, marginTop:2,
+                                  overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:280 }}>
+                                  {cortado}
+                                </div>}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="col-contacto" style={{ fontFamily:"'DM Mono',monospace", fontSize:12, color:t.textSub, lineHeight:1.5 }}>
                           <div style={{ marginBottom:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.email||"—"}</div>
