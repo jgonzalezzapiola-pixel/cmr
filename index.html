@@ -882,29 +882,39 @@ function KanbanView({ clientes, onUpdateCliente, t, isAdmin, user, encargados=[]
           </div>
         </div>
       )}
-      <div className="kanban-board" style={{ display:"grid", gridTemplateColumns:"repeat(4,minmax(240px,1fr))", gap:12, overflowX:"auto", paddingBottom:8 }}>
+      <div style={{ display:"flex", flexDirection:"column" }}>
         {ESTADOS_TICKET.map(estado=>{
           const col=allTickets.filter(tk=>tk.estado===estado);
           const cfg=t.et(estado);
           return (
-            <div key={estado} style={{ display:"flex", flexDirection:"column", minWidth:0 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-                <span>{ET[estado].icon}</span>
-                <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:cfg.color, textTransform:"uppercase", letterSpacing:"0.08em" }}>{estado}</span>
-                <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:t.textMuted, background:t.card, border:`1px solid ${t.border}`, borderRadius:10, padding:"0 7px", marginLeft:"auto" }}>{col.length}</span>
+            <div key={estado} style={{ borderBottom:`1px solid ${t.border}` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 16px",
+                background:t.isDark?"#161b27":"#f8fafc" }}>
+                <span style={{ fontSize:16 }}>{ET[estado].icon}</span>
+                <span style={{ fontSize:12, fontWeight:700, color:cfg.color,
+                  textTransform:"uppercase", letterSpacing:"0.08em" }}>{estado}</span>
+                <span style={{ fontSize:12, fontWeight:600, color:t.textMuted,
+                  background:t.card, border:`1px solid ${t.border}`,
+                  borderRadius:20, padding:"1px 10px" }}>{col.length}</span>
               </div>
-              <div className="kanban-col" style={{ display:"flex", flexDirection:"column", gap:8, maxHeight:"calc(100vh - 240px)", overflowY:"auto" }}>
-                {col.length===0&&<div style={{ background:t.card, border:`1px dashed ${t.border}`, borderRadius:10, padding:"20px", textAlign:"center", color:t.textMuted, fontFamily:"'DM Mono',monospace", fontSize:11 }}>Sin tickets</div>}
-                {[...col].sort((a,b)=>{ const ord={Alta:0,Media:1,Baja:2}; return (ord[a.prioridad]??1)-(ord[b.prioridad]??1); })
-                  .map(tk=>(
-                    <KanbanCard key={tk.id} ticket={tk} clienteNombre={tk.clienteNombre}
-                      isAdmin={isAdmin}
-                      onEdit={x=>setEditando({ticket:{...x}, clienteId:tk.clienteId})}
-                      onDelete={()=>delTicket(tk.clienteId,tk.id)}
-                      onChangeEstado={(_,ne)=>cambiarEstado(tk.clienteId,tk.id,ne)}
-                      onAddComentario={(_,txt)=>addComentario(tk.clienteId,tk.id,txt)}
-                      t={t}/>
-                  ))}
+              <div style={{ display:"flex", gap:12, padding:"12px 16px", overflowX:"auto",
+                minHeight:col.length===0?72:0, alignItems:col.length===0?"center":"flex-start" }}>
+                {col.length===0?(
+                  <div style={{ color:t.textMuted, fontSize:12, width:"100%", textAlign:"center" }}>Sin tickets</div>
+                ):(
+                  [...col].sort((a,b)=>{ const ord={Alta:0,Media:1,Baja:2}; return (ord[a.prioridad]??1)-(ord[b.prioridad]??1); })
+                    .map(tk=>(
+                      <div key={tk.id} style={{ minWidth:260, maxWidth:300, flexShrink:0 }}>
+                        <KanbanCard ticket={tk} clienteNombre={tk.clienteNombre}
+                          isAdmin={isAdmin}
+                          onEdit={x=>setEditando({ticket:{...x}, clienteId:tk.clienteId})}
+                          onDelete={()=>delTicket(tk.clienteId,tk.id)}
+                          onChangeEstado={(_,ne)=>cambiarEstado(tk.clienteId,tk.id,ne)}
+                          onAddComentario={(_,txt)=>addComentario(tk.clienteId,tk.id,txt)}
+                          t={t}/>
+                      </div>
+                    ))
+                )}
               </div>
             </div>
           );
