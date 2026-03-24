@@ -438,20 +438,79 @@ function FormTicket({ inicial, onSave, onCancel, t, encargados=[], clientes=[], 
     </div>
   );
 }
-function FormCliente({ inicial, onSave, onCancel, t }) {
-  const [form,setForm]=useState({...inicial}); const set=k=>v=>setForm(f=>({...f,[k]:v}));
+function FormCliente({ inicial, onSave, onCancel, t, clientes=[], onVerCliente }) {
+  const [form,setForm]=useState({...inicial});
+  const set=k=>v=>setForm(f=>({...f,[k]:v}));
+  const esEdicion = !!inicial.email || !!inicial.telefono; // si ya tiene datos es edicion
+
+  // validaciones de duplicados (solo al crear, no al editar)
+  const clienteIdActual = inicial.id;
+
+  const dupeEmail = !esEdicion && form.email?.trim()
+    ? clientes.find(c=>c.id!==clienteIdActual && c.email?.toLowerCase()===form.email.trim().toLowerCase())
+    : null;
+
+  const dupeTel = !esEdicion && form.telefono?.trim()
+    ? clientes.find(c=>c.id!==clienteIdActual && c.telefono?.replace(/\s/g,"")===form.telefono.trim().replace(/\s/g,""))
+    : null;
+
+  const dupeNombre = !esEdicion && form.nombre?.trim().length>2
+    ? clientes.find(c=>c.id!==clienteIdActual && c.nombre?.toLowerCase()===form.nombre.trim().toLowerCase())
+    : null;
+
+  const bloqueante = dupeEmail || dupeTel; // estos bloquean
+  const canSave = form.nombre.trim() && !bloqueante;
+
+  const AlertaDupe = ({ cliente, campo, onVer }) => (
+    <div style={{ background:t.isDark?"rgba(239,68,68,0.1)":"#fef2f2",
+      border:"1px solid rgba(239,68,68,0.35)", borderRadius:10, padding:"12px 14px" }}>
+      <div style={{ fontSize:13, fontWeight:600, color:"#ef4444", marginBottom:6 }}>
+        ⚠️ {campo} ya registrado en otro cliente
+      </div>
+      <div style={{ fontSize:13, color:t.text, marginBottom:10 }}>
+        <strong>{cliente.nombre}</strong>
+        {cliente.email&&<span style={{ color:t.textMuted }}> · {cliente.email}</span>}
+        {cliente.telefono&&<span style={{ color:t.textMuted }}> · {cliente.telefono}</span>}
+      </div>
+      <button onClick={()=>onVer(cliente)}
+        style={{ background:t.accent, color:"#fff", border:"none", borderRadius:8,
+          padding:"7px 14px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+        Abrir ese cliente →
+      </button>
+    </div>
+  );
+
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
       <div className="form-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-        <FInput label="Nombre *" value={form.nombre}   onChange={set("nombre")}   placeholder="Juan Garcia" t={t}/>
+        <FInput label="Nombre *" value={form.nombre} onChange={set("nombre")} placeholder="Juan Garcia" t={t}/>
         <FInput label="Telefono" value={form.telefono} onChange={set("telefono")} placeholder="+54 9 11..." t={t}/>
-        <FInput label="Email"    value={form.email}    onChange={set("email")}    type="email" placeholder="juan@mail.com" t={t}/>
-        <FSel   label="Estado"   value={form.estado}   onChange={set("estado")}   options={ESTADOS_CLIENTE} t={t}/>
+        <FInput label="Email"    value={form.email}    onChange={set("email")} type="email" placeholder="juan@mail.com" t={t}/>
+        <FSel   label="Estado"   value={form.estado}   onChange={set("estado")} options={ESTADOS_CLIENTE} t={t}/>
       </div>
+
+      {/* Advertencia suave: nombre repetido */}
+      {dupeNombre&&!bloqueante&&(
+        <div style={{ background:t.isDark?"rgba(245,158,11,0.1)":"#fffbeb",
+          border:"1px solid rgba(245,158,11,0.4)", borderRadius:10, padding:"10px 14px",
+          display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:18 }}>⚠️</span>
+          <div style={{ fontSize:13, color:t.isDark?"#fbbf24":"#92400e" }}>
+            Ya existe un cliente llamado <strong>{dupeNombre.nombre}</strong> — si son personas distintas podés continuar igual.
+          </div>
+        </div>
+      )}
+
+      {/* Bloqueo: email duplicado */}
+      {dupeEmail&&<AlertaDupe cliente={dupeEmail} campo="Email" onVer={c=>{onVerCliente&&onVerCliente(c); onCancel();}}/>}
+
+      {/* Bloqueo: teléfono duplicado */}
+      {dupeTel&&!dupeEmail&&<AlertaDupe cliente={dupeTel} campo="Teléfono" onVer={c=>{onVerCliente&&onVerCliente(c); onCancel();}}/>}
+
       <FTextarea label="Notas internas" value={form.notas} onChange={set("notas")} rows={2} t={t}/>
       <div style={{ display:"flex", gap:8, justifyContent:"flex-end", paddingTop:4 }}>
         <Btn variant="secondary" onClick={onCancel} t={t}>Cancelar</Btn>
-        <Btn onClick={()=>form.nombre.trim()&&onSave(form)} t={t} disabled={!form.nombre.trim()}>Guardar cliente</Btn>
+        <Btn onClick={()=>canSave&&onSave(form)} t={t} disabled={!canSave}>Guardar cliente</Btn>
       </div>
     </div>
   );
@@ -785,7 +844,7 @@ function DetalleCliente({ cliente, onClose, onUpdate, onDelete, onUpdateOtherCli
       subtitle={!editCliente?`${cliente.email||""}${cliente.email&&cliente.telefono?" · ":""}${cliente.telefono||""}`:undefined}
       onClose={onClose} width={700} t={t}>
       {editCliente?(
-        <FormCliente inicial={cliente} onSave={async f=>{await onUpdate(f);setEditCliente(false);}} onCancel={()=>setEditCliente(false)} t={t}/>
+        <FormCliente inicial={cliente} onSave={async f=>{await onUpdate(f);setEditCliente(false);}} onCancel={()=>setEditCliente(false)} clientes={allClientes} t={t}/>
       ):(
         <>
           <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", marginBottom:18, paddingBottom:16, borderBottom:`1px solid ${t.border}` }}>
@@ -1351,7 +1410,8 @@ function CRM({ user, onLogout }) {
 
       {nuevoModal&&(
         <Modal title="Nuevo cliente" onClose={()=>setNuevoModal(false)} t={t}>
-          <FormCliente inicial={emptyCliente()} onSave={agregarCliente} onCancel={()=>setNuevoModal(false)} t={t}/>
+          <FormCliente inicial={emptyCliente()} onSave={agregarCliente} onCancel={()=>setNuevoModal(false)}
+            clientes={clientes} onVerCliente={c=>{ setNuevoModal(false); setClienteSel(c); }} t={t}/>
         </Modal>
       )}
       {quickTicket&&(
